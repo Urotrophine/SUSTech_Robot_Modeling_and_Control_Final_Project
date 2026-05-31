@@ -1,0 +1,10 @@
+name: me311-mujoco
+channels:
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+      - mujoco
+      - numpy
+      - PyYAML

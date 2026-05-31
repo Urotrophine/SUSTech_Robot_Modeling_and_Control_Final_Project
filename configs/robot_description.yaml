@@ -1,0 +1,60 @@
+# Robot description registry.
+# Keep this file as the single source of truth for joint/site names.
+robot:
+  model_xml: models/simple_grasp_scene.xml
+  source_urdf: assets/urdf/robotic_arm_v7.urdf
+
+arm:
+  joints:
+    - joint1
+    - joint2
+    - joint3
+    - joint4
+    - joint5
+    - joint6
+  command_names:
+    - q1
+    - q2
+    - q3
+    - q4
+    - d5
+    - q6
+  units:
+    q1: rad
+    q2: rad
+    q3: rad
+    q4: rad
+    d5: m
+    q6: rad
+
+gripper:
+  type: mimic_parallel_gripper
+  master_joint: joint71
+  mimic_joint: joint72
+  actuator: gripper_opening_left
+  mimic_actuator: gripper_opening_right
+  command_name: g
+  unit: m
+  opening_range:
+    min: -0.05
+    max: 0.015
+  open_command: -0.05
+  close_command: 0.004
+  mimic:
+    joint: joint72
+    source: joint71
+    multiplier: -1.0
+    offset: 0.0
+
+sites:
+  end_effector: ee_site
+  peg_tip: peg_tip_site
+  left_finger_tip: left_finger_tip_site
+  right_finger_tip: right_finger_tip_site
+  hole_entry: hole_entry_site
+  hole_axis: hole_axis_site
+
+  topology:
+    fin1_parent: link6
+    fin2_parent: link6
+    note: v7 uses joint1-joint6 as the 6DOF arm. joint5 is prismatic with 0 to 0.2 m travel. joint71 drives the gripper from -0.05 to 0.015 m and joint72 mirrors it from 0.05 to -0.015 m for symmetric motion.
