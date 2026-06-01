@@ -31,15 +31,15 @@ gripper:
   type: mimic_parallel_gripper
   master_joint: joint71
   mimic_joint: joint72
-  actuator: gripper_opening_left
-  mimic_actuator: gripper_opening_right
+  actuator: gripper_left_motor
+  mimic_actuator: gripper_right_motor
   command_name: g
   unit: m
   opening_range:
     min: -0.05
     max: 0.015
   open_command: -0.05
-  close_command: 0.004
+  close_command: 0.014
   mimic:
     joint: joint72
     source: joint71

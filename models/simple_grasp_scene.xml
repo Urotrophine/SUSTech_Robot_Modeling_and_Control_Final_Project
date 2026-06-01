@@ -32,11 +32,11 @@
         <geom type="mesh" rgba="1 1 1 1" mesh="link2" name="link2_visual" contype="2" conaffinity="0" group="1" density="0" condim="6" solref="0.001 1" solimp="0.99 0.999 0.0001" friction="5 1 0.1" />
         <body name="link3" pos="-0.055 0.4 -0.065" quat="0.499998 0.5 0.500002 0.5">
           <inertial pos="0.0398975 0 -0.0626423" quat="0.497692 0.502297 0.502297 0.497692" mass="2.32723" diaginertia="0.0113093 0.0112712 0.00383359" />
-          <joint name="joint3" pos="0 0 0" axis="0 0 -1" range="-3.14 3.14" actuatorfrcrange="-100 100" />
+          <joint name="joint3" pos="0 0 0" axis="0 0 -1" range="-3.14 3.14" actuatorfrcrange="-100 100" damping="2.5" armature="0.05" />
           <geom type="mesh" rgba="1 1 1 1" mesh="link3" name="link3_visual" contype="2" conaffinity="0" group="1" density="0" condim="6" solref="0.001 1" solimp="0.99 0.999 0.0001" friction="5 1 0.1" />
           <body name="link4" pos="0.16 0 -0.065" quat="0.499998 0.5 0.500002 0.5">
             <inertial pos="0 -1.73683e-12 0.047952" mass="0.455426" diaginertia="0.00111346 0.000921461 0.000888619" />
-            <joint name="joint4" pos="0 0 0" axis="0 0 1" range="-3.14 3.14" actuatorfrcrange="-100 100" />
+            <joint name="joint4" pos="0 0 0" axis="0 0 1" range="-3.14 3.14" actuatorfrcrange="-100 100" damping="2.5" armature="0.05" />
             <geom type="mesh" rgba="1 1 1 1" mesh="link4" name="link4_visual" contype="2" conaffinity="0" group="1" density="0" condim="6" solref="0.001 1" solimp="0.99 0.999 0.0001" friction="5 1 0.1" />
             <body name="link5" pos="0.05 -0.05 0.1" quat="0.499998 0.5 0.500002 0.5">
               <inertial pos="0.05 -0.04 0.0484868" mass="1.93924" diaginertia="0.015873 0.015873 0.00205979" />
@@ -44,17 +44,17 @@
               <geom type="mesh" rgba="0.796078 0.823529 0.937255 1" mesh="link5" name="link5_visual" contype="2" conaffinity="0" group="1" density="0" condim="6" solref="0.001 1" solimp="0.99 0.999 0.0001" friction="5 1 0.1" />
               <body name="link6" pos="0.05 -0.04 -0.11" quat="-2.59734e-06 -0.707105 0.707108 2.59735e-06">
                 <inertial pos="0 1.73705e-12 0.0690013" quat="0.707107 0 0 0.707107" mass="0.897727" diaginertia="0.00214144 0.00160944 0.00151936" />
-                <joint name="joint6" pos="0 0 0" axis="0 0 1" range="-3.14 3.14" actuatorfrcrange="-100 100" />
+                <joint name="joint6" pos="0 0 0" axis="0 0 1" actuatorfrcrange="-100 100" damping="4.0" armature="0.08" />
                 <geom type="mesh" rgba="1 1 1 1" mesh="link6" name="link6_visual" contype="2" conaffinity="0" group="1" density="0" condim="6" solref="0.001 1" solimp="0.99 0.999 0.0001" friction="5 1 0.1" />
                 <body name="fin1" pos="-0.1 0.04 0.12" quat="0.499998 -0.5 0.500002 -0.5">
                   <inertial pos="0.04 -0.0468605 0.0575" quat="0 0.707107 0 0.707107" mass="0.301" diaginertia="0.0004287 0.00027036 0.000219794" />
-                  <joint name="joint71" pos="0 0 0" axis="0 0 1" type="slide" range="-0.05 0.015" actuatorfrcrange="-100 100" />
+                  <joint name="joint71" pos="0 0 0" axis="0 0 1" type="slide" range="-0.05 0.015" actuatorfrcrange="-100 100" damping="25.0" armature="0.02" />
                   <geom type="mesh" rgba="1 1 1 1" mesh="fin1" name="fin1_visual" contype="2" conaffinity="0" group="1" density="0" condim="6" solref="0.001 1" solimp="0.99 0.999 0.0001" friction="200 20 2" />
                   <site name="left_finger_tip_site" pos="0.04 -0.046 0.0575" size="0.006" rgba="0.8 0 0 1" />
                 </body>
                 <body name="fin2" pos="-0.1 0.04 0.12" quat="0.499998 -0.5 0.500002 -0.5">
                   <inertial pos="0.04 -0.0468605 0.1425" quat="0 0.707107 0 0.707107" mass="0.301" diaginertia="0.0004287 0.00027036 0.000219794" />
-                  <joint name="joint72" pos="0 0 0" axis="0 0 1" type="slide" range="-0.015 0.05" actuatorfrcrange="-100 100" />
+                  <joint name="joint72" pos="0 0 0" axis="0 0 1" type="slide" range="-0.015 0.05" actuatorfrcrange="-100 100" damping="25.0" armature="0.02" />
                   <geom type="mesh" rgba="1 1 1 1" mesh="fin2" name="fin2_visual" contype="2" conaffinity="0" group="1" density="0" condim="6" solref="0.001 1" solimp="0.99 0.999 0.0001" friction="200 20 2" />
                   <site name="right_finger_tip_site" pos="0.04 -0.046 0.1425" size="0.006" rgba="0 0 0.8 1" />
                 </body>
@@ -72,13 +72,13 @@
     </body>
   </worldbody>
   <actuator>
-    <position name="joint1_pos" joint="joint1" kp="350" kv="35" ctrllimited="true" ctrlrange="-3.14 3.14" />
-    <position name="joint2_pos" joint="joint2" kp="350" kv="35" ctrllimited="true" ctrlrange="-3.14 3.14" />
-    <position name="joint3_pos" joint="joint3" kp="350" kv="35" ctrllimited="true" ctrlrange="-3.14 3.14" />
-    <position name="joint4_pos" joint="joint4" kp="350" kv="35" ctrllimited="true" ctrlrange="-3.14 3.14" />
-    <position name="joint5_pos" joint="joint5" kp="1400" kv="140" ctrllimited="true" ctrlrange="0 0.2" />
-    <position name="joint6_pos" joint="joint6" kp="350" kv="35" ctrllimited="true" ctrlrange="-3.14 3.14" />
-    <position name="gripper_opening_left" joint="joint71" kp="2600" kv="180" ctrllimited="true" ctrlrange="-0.05 0.015" forcelimited="true" forcerange="-1200 1200" />
-    <position name="gripper_opening_right" joint="joint72" kp="2600" kv="180" ctrllimited="true" ctrlrange="-0.015 0.05" forcelimited="true" forcerange="-1200 1200" />
+    <motor name="joint1_motor" joint="joint1" ctrllimited="true" ctrlrange="-90 90" />
+    <motor name="joint2_motor" joint="joint2" ctrllimited="true" ctrlrange="-90 90" />
+    <motor name="joint3_motor" joint="joint3" ctrllimited="true" ctrlrange="-220 220" />
+    <motor name="joint4_motor" joint="joint4" ctrllimited="true" ctrlrange="-220 220" />
+    <motor name="joint5_motor" joint="joint5" ctrllimited="true" ctrlrange="-180 180" />
+    <motor name="joint6_motor" joint="joint6" ctrllimited="true" ctrlrange="-160 160" />
+    <motor name="gripper_left_motor" joint="joint71" ctrllimited="true" ctrlrange="-95 95" />
+    <motor name="gripper_right_motor" joint="joint72" ctrllimited="true" ctrlrange="-95 95" />
   </actuator>
 </mujoco>

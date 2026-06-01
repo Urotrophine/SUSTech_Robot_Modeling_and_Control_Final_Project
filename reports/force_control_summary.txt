@@ -1,0 +1,19 @@
+Force/impedance-control quantitative summary
+
+duration_s: 10.022
+max_contact_force_n: 70.8908
+mean_contact_force_n: 8.70492
+final_inserted_depth_m: 0.059447
+insertion_phase_depth_change_m: 0.059447
+max_abs_joint3_rad: 0.00963759
+max_abs_joint4_rad: 0.0392193
+final_joint6_turns: 1.91424
+max_tracking_error: 1.05189
+max_tracking_error_without_q6: 0.0483604
+max_q34_tracking_error: 0.0392848
+final_xy_error_m: 0.00408325
+
+Notes:
+- The full arm tracking error contains joint6 screwing error. The large transient at the start of insertion is expected because joint6 receives a multi-turn target.
+- The peg XY chart filters out initialization and grasp-establishment discontinuities, then shows the carried peg path used for search/insertion.
+- Insertion depth is plotted in millimeters on a separate y-axis; it is not constant during the insertion phase.

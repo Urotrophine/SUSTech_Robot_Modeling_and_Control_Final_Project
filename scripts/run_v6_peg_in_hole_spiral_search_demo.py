@@ -52,7 +52,7 @@ FIXED_Q4 = 0.0
 FIXED_Q6 = 0.0
 LIFT_JOINT5 = 0.0
 OPEN_CMD = -0.05
-CLOSE_CMD = 0.004
+CLOSE_CMD = 0.014
 
 DEFAULT_OBJECT_POS = np.array([-0.280, -0.620, TABLE_TOP_Z + CYL_HALF_LENGTH], dtype=float)
 OBJECT_POS = DEFAULT_OBJECT_POS.copy()
@@ -65,15 +65,19 @@ HOLE_BLOCK_HALF_WIDTH = 0.145
 OBJECT_HOLE_BLOCK_CLEARANCE = CYL_RADIUS + 0.035
 MIN_OBJECT_HOLE_DISTANCE = HOLE_BLOCK_HALF_WIDTH + OBJECT_HOLE_BLOCK_CLEARANCE
 GRASP_HEIGHT_ABOVE_CENTER = CYL_HALF_LENGTH * 0.95
-INSERT_DEPTH_TARGET = min(0.045, HOLE_DEPTH - 0.020)
+INSERT_DEPTH_TARGET = min(0.070, HOLE_DEPTH - 0.010)
 INSERT_JOINT5_MARGIN = 0.004
 CONTACT_GAP = 0.0015
 SEARCH_ALIGN_ERROR = np.array([0.024, -0.018], dtype=float)
 SPIRAL_PITCH = 0.012
 SPIRAL_THETA_STEP = 0.24
 SPIRAL_MAX_RADIUS = 0.065
-SPIRAL_STEP_DURATION = 0.045
+SPIRAL_STEP_DURATION = 0.035
 SPIRAL_SUCCESS_RADIUS = max(0.003, HOLE_RADIUS - CYL_RADIUS + 0.001)
+SCREW_TURNS = 2.0
+SCREW_INSERT_DURATION = 1.10
+CONTACT_DOWN_FORCE = 1.2
+INSERT_DOWN_FORCE = 2.0
 
 
 def name_id(model: mujoco.MjModel, obj_type: mujoco.mjtObj, name: str) -> int:
@@ -383,6 +387,29 @@ def body_world_pose(api: ArmPlatformAPI, body_name: str) -> tuple[np.ndarray, np
     return api.data.xpos[bid].copy(), api.data.xmat[bid].reshape(3, 3).copy()
 
 
+def body_world_pose_at_arm_q(api: ArmPlatformAPI, body_name: str, q_arm: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    saved_qpos = api.data.qpos.copy()
+    saved_qvel = api.data.qvel.copy()
+    api.data.qpos[api.kin.qpos_idx] = np.asarray(q_arm, dtype=float)
+    api.data.qvel[api.kin.qvel_idx] = 0.0
+    mujoco.mj_forward(api.model, api.data)
+    pose = body_world_pose(api, body_name)
+    api.data.qpos[:] = saved_qpos
+    api.data.qvel[:] = saved_qvel
+    mujoco.mj_forward(api.model, api.data)
+    return pose
+
+
+def object_pose_from_lock_at_arm_q(
+    api: ArmPlatformAPI,
+    q_arm: np.ndarray,
+    grasp_lock: tuple[np.ndarray, np.ndarray],
+) -> tuple[np.ndarray, np.ndarray]:
+    rel_pos, rel_rot = grasp_lock
+    link_pos, link_rot = body_world_pose_at_arm_q(api, "link6", q_arm)
+    return link_pos + link_rot @ rel_pos, link_rot @ rel_rot
+
+
 def capture_grasp_lock(api: ArmPlatformAPI) -> tuple[np.ndarray, np.ndarray]:
     mujoco.mj_forward(api.model, api.data)
     link_pos, link_rot = body_world_pose(api, "link6")
@@ -392,14 +419,21 @@ def capture_grasp_lock(api: ArmPlatformAPI) -> tuple[np.ndarray, np.ndarray]:
     return rel_pos, rel_rot
 
 
-def apply_grasp_lock(api: ArmPlatformAPI, grasp_lock: tuple[np.ndarray, np.ndarray] | None) -> None:
+def apply_grasp_lock(
+    api: ArmPlatformAPI,
+    grasp_lock: tuple[np.ndarray, np.ndarray] | None,
+    position_q_arm: np.ndarray | None = None,
+) -> None:
     if grasp_lock is None:
         return
     mujoco.mj_forward(api.model, api.data)
     rel_pos, rel_rot = grasp_lock
     link_pos, link_rot = body_world_pose(api, "link6")
-    obj_pos = link_pos + link_rot @ rel_pos
-    obj_rot = link_rot @ rel_rot
+    pos_link_pos, pos_link_rot = (link_pos, link_rot)
+    if position_q_arm is not None:
+        pos_link_pos, pos_link_rot = body_world_pose_at_arm_q(api, "link6", position_q_arm)
+    obj_pos = pos_link_pos + pos_link_rot @ rel_pos
+    obj_rot = pos_link_rot @ rel_rot
     joint_id = name_id(api.model, mujoco.mjtObj.mjOBJ_JOINT, "grasp_object_freejoint")
     qadr = api.model.jnt_qposadr[joint_id]
     vadr = api.model.jnt_dofadr[joint_id]
@@ -418,6 +452,9 @@ def solve_revolute12_xy(
     start = perf_counter()
     model = api.model
     data = api.data
+    saved_qpos = data.qpos.copy()
+    saved_qvel = data.qvel.copy()
+    saved_ctrl = data.ctrl.copy()
     q = np.asarray(q_init, dtype=float).copy()
     q[2] = FIXED_Q3
     q[3] = FIXED_Q4
@@ -459,14 +496,69 @@ def solve_revolute12_xy(
         q[3] = FIXED_Q4
         q[5] = FIXED_Q6
 
-    data.qpos[arm_idx] = q
-    data.qvel[:] = 0.0
-    mujoco.mj_forward(model, data)
-    final_err = float(np.linalg.norm(np.asarray(target_xy) - finger_midpoint(api)[:2]))
+    try:
+        data.qpos[arm_idx] = q
+        data.qvel[:] = 0.0
+        mujoco.mj_forward(model, data)
+        final_err = float(np.linalg.norm(np.asarray(target_xy) - finger_midpoint(api)[:2]))
+        if verbose:
+            print(f"IK {label:14s}: iter={iterations:3d} time={(perf_counter() - start) * 1000.0:5.1f} ms xy_err={final_err:.4f}")
+        if final_err > 0.025:
+            raise RuntimeError(f"XY target {label} is too far: {final_err:.4f} m")
+        return q.copy()
+    finally:
+        data.qpos[:] = saved_qpos
+        data.qvel[:] = saved_qvel
+        data.ctrl[:] = saved_ctrl
+        mujoco.mj_forward(model, data)
+
+
+def solve_revolute12_for_locked_object_xy(
+    api: ArmPlatformAPI,
+    target_xy: np.ndarray,
+    q_init: np.ndarray,
+    grasp_lock: tuple[np.ndarray, np.ndarray],
+    label: str,
+    verbose: bool = False,
+) -> np.ndarray:
+    start = perf_counter()
+    q = np.asarray(q_init, dtype=float).copy()
+    q[2] = FIXED_Q3
+    q[3] = FIXED_Q4
+
+    joint_ids = [name_id(api.model, mujoco.mjtObj.mjOBJ_JOINT, n) for n in ("joint1", "joint2")]
+    q_low = np.array([api.model.jnt_range[jid, 0] for jid in joint_ids], dtype=float)
+    q_high = np.array([api.model.jnt_range[jid, 1] for jid in joint_ids], dtype=float)
+    target_xy = np.asarray(target_xy, dtype=float)
+
+    final_err = float("inf")
+    for iterations in range(18):
+        obj_pos, _ = object_pose_from_lock_at_arm_q(api, q, grasp_lock)
+        err = target_xy - obj_pos[:2]
+        final_err = float(np.linalg.norm(err))
+        if final_err < 0.0015:
+            break
+
+        jac = np.zeros((2, 2), dtype=float)
+        eps = 1e-4
+        for col in range(2):
+            q_eps = q.copy()
+            q_eps[col] += eps
+            pos_eps, _ = object_pose_from_lock_at_arm_q(api, q_eps, grasp_lock)
+            jac[:, col] = (pos_eps[:2] - obj_pos[:2]) / eps
+
+        dq = jac.T @ np.linalg.solve(jac @ jac.T + 2e-5 * np.eye(2), err)
+        dq_norm = float(np.linalg.norm(dq))
+        if dq_norm > 0.075:
+            dq *= 0.075 / dq_norm
+        q[:2] = np.clip(q[:2] + 0.85 * dq, q_low, q_high)
+        q[2] = FIXED_Q3
+        q[3] = FIXED_Q4
+
     if verbose:
-        print(f"IK {label:14s}: iter={iterations:3d} time={(perf_counter() - start) * 1000.0:5.1f} ms xy_err={final_err:.4f}")
-    if final_err > 0.025:
-        raise RuntimeError(f"XY target {label} is too far: {final_err:.4f} m")
+        print(f"IK {label:14s}: time={(perf_counter() - start) * 1000.0:5.1f} ms xy_err={final_err:.4f}")
+    if final_err > 0.012:
+        raise RuntimeError(f"Locked-object XY target {label} is too far: {final_err:.4f} m")
     return q.copy()
 
 
@@ -489,6 +581,28 @@ def set_arm_qpos(api: ArmPlatformAPI, q_arm: np.ndarray, qvel_arm: np.ndarray | 
     api.arm_controller.set_target(q)
 
 
+def command_arm_target(
+    api: ArmPlatformAPI,
+    q_arm: np.ndarray,
+    qvel_arm: np.ndarray | None = None,
+    lock_joint6: bool = True,
+    joint34_target: np.ndarray | None = None,
+) -> None:
+    q = np.asarray(q_arm, dtype=float).copy()
+    if joint34_target is None:
+        q[2] = FIXED_Q3
+        q[3] = FIXED_Q4
+    else:
+        q[2:4] = np.asarray(joint34_target, dtype=float)
+    if lock_joint6:
+        q[5] = FIXED_Q6
+    qd = None if qvel_arm is None else np.asarray(qvel_arm, dtype=float).copy()
+    if qd is not None and lock_joint6:
+        qd[5] = 0.0
+    api.arm_target = q.copy()
+    api.arm_controller.set_target(q, qd_des=qd)
+
+
 def set_gripper_qpos(api: ArmPlatformAPI, opening: float) -> None:
     for name, value in (("joint71", opening), ("joint72", -opening)):
         jid = name_id(api.model, mujoco.mjtObj.mjOBJ_JOINT, name)
@@ -501,21 +615,53 @@ def hold_gripper_target(api: ArmPlatformAPI, opening: float) -> None:
     api.set_gripper(opening)
 
 
+def set_fsc_down_force(api: ArmPlatformAPI, force_n: float) -> None:
+    """Use FSC: z force is mostly feed-forward, x/y and orientation remain PID controlled."""
+    if hasattr(api.arm_controller, "set_motion_axis_mask"):
+        api.arm_controller.set_motion_axis_mask([1.0, 1.0, 0.35, 1.0, 1.0, 1.0])
+        api.arm_controller.set_task_feedforward_wrench(
+            [0.0, 0.0, -abs(float(force_n)), 0.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
+        )
+
+
+def clear_fsc_force(api: ArmPlatformAPI) -> None:
+    if hasattr(api.arm_controller, "clear_task_force"):
+        api.arm_controller.clear_task_force()
+
+
 def step(api: ArmPlatformAPI, viewer=None) -> None:
+    api.update_control()
     mujoco.mj_step(api.model, api.data)
     if viewer is not None:
         viewer.sync()
         time.sleep(max(0.0, api.model.opt.timestep))
 
 
-def hold_current(api: ArmPlatformAPI, seconds: float, viewer=None, gripper_closed: bool = False, grasp_lock=None) -> None:
+def hold_current(
+    api: ArmPlatformAPI,
+    seconds: float,
+    viewer=None,
+    gripper_closed: bool = False,
+    grasp_lock=None,
+    lock_joint6: bool = True,
+    decouple_screw_position: bool = False,
+    position_joint6: float | None = None,
+    position_q_arm: np.ndarray | None = None,
+    preserve_joint34: bool = False,
+) -> None:
     q = api.arm_controller.get_q()
+    joint34_target = q[2:4].copy() if preserve_joint34 else None
     steps = max(1, int(seconds / api.model.opt.timestep))
     for _ in range(steps):
-        set_arm_qpos(api, q)
+        command_arm_target(api, q, lock_joint6=lock_joint6, joint34_target=joint34_target)
         if gripper_closed:
             hold_gripper_target(api, CLOSE_CMD)
-        apply_grasp_lock(api, grasp_lock)
+        position_q = None
+        if decouple_screw_position:
+            position_q = q.copy() if position_q_arm is None else np.asarray(position_q_arm, dtype=float).copy()
+            position_q[5] = q[5] if position_joint6 is None else float(position_joint6)
+        apply_grasp_lock(api, grasp_lock, position_q_arm=position_q)
         step(api, viewer)
 
 
@@ -527,47 +673,134 @@ def move_arm(
     gripper_closed: bool = False,
     grasp_lock=None,
     stop_on_object_collision: bool = False,
+    lock_joint6: bool = True,
+    decouple_screw_position: bool = False,
+    preserve_joint34: bool = False,
 ) -> None:
     q_start = api.arm_controller.get_q()
     q_goal = np.asarray(q_goal, dtype=float).copy()
-    q_goal[2] = FIXED_Q3
-    q_goal[3] = FIXED_Q4
-    q_goal[5] = FIXED_Q6
+    joint34_target = q_start[2:4].copy() if preserve_joint34 else None
+    if preserve_joint34:
+        q_goal[2:4] = joint34_target
+    else:
+        q_goal[2] = FIXED_Q3
+        q_goal[3] = FIXED_Q4
+    if lock_joint6:
+        q_goal[5] = FIXED_Q6
     steps = max(1, int(duration / api.model.opt.timestep))
     prev_q = q_start.copy()
     final_q = q_start.copy()
     for i in range(steps):
         s = smoothstep5((i + 1) / steps)
         q = q_start + s * (q_goal - q_start)
-        q[2] = FIXED_Q3
-        q[3] = FIXED_Q4
-        q[5] = FIXED_Q6
+        if preserve_joint34:
+            q[2:4] = joint34_target
+        else:
+            q[2] = FIXED_Q3
+            q[3] = FIXED_Q4
+        if lock_joint6:
+            q[5] = FIXED_Q6
         qvel = (q - prev_q) / api.model.opt.timestep
         qvel[2] = 0.0
         qvel[3] = 0.0
-        qvel[5] = 0.0
-        set_arm_qpos(api, q, qvel)
+        if lock_joint6:
+            qvel[5] = 0.0
+        command_arm_target(api, q, qvel, lock_joint6=lock_joint6, joint34_target=joint34_target)
         if gripper_closed:
             hold_gripper_target(api, CLOSE_CMD)
-        apply_grasp_lock(api, grasp_lock)
+        position_q = None
+        if decouple_screw_position:
+            position_q = q.copy()
+            position_q[5] = q_start[5]
+        apply_grasp_lock(api, grasp_lock, position_q_arm=position_q)
         if stop_on_object_collision:
             mujoco.mj_forward(api.model, api.data)
             if count_bad_robot_object_contacts(api) > 0:
                 print("  insertion stopped: predicted robot-object collision")
                 final_q = prev_q.copy()
-                set_arm_qpos(api, final_q)
+                command_arm_target(api, final_q, lock_joint6=lock_joint6, joint34_target=joint34_target)
                 if gripper_closed:
                     hold_gripper_target(api, CLOSE_CMD)
-                apply_grasp_lock(api, grasp_lock)
+                apply_grasp_lock(api, grasp_lock, position_q_arm=position_q)
                 break
         prev_q = q.copy()
         final_q = q.copy()
         step(api, viewer)
     else:
         final_q = q_goal.copy()
-    set_arm_qpos(api, final_q)
+    command_arm_target(api, final_q, lock_joint6=lock_joint6, joint34_target=joint34_target)
     if gripper_closed:
         hold_gripper_target(api, CLOSE_CMD)
+    position_q = None
+    if decouple_screw_position:
+        position_q = final_q.copy()
+        position_q[5] = q_start[5]
+    apply_grasp_lock(api, grasp_lock, position_q_arm=position_q)
+
+
+def joint5_insertion_target(q_current: np.ndarray, joint5_value: float) -> np.ndarray:
+    q = np.asarray(q_current, dtype=float).copy()
+    q[4] = float(joint5_value)
+    q[5] = FIXED_Q6
+    return q
+
+
+def joint5_screwing_target(q_current: np.ndarray, joint5_value: float, turns: float) -> np.ndarray:
+    q = np.asarray(q_current, dtype=float).copy()
+    q[4] = float(joint5_value)
+    q[5] = float(q_current[5] + turns * 2.0 * math.pi)
+    return q
+
+
+def move_arm_screwing_compensated(
+    api: ArmPlatformAPI,
+    q_goal: np.ndarray,
+    duration: float,
+    grasp_lock: tuple[np.ndarray, np.ndarray],
+    target_peg_xy: np.ndarray,
+    viewer=None,
+) -> None:
+    q_start = api.arm_controller.get_q()
+    q_goal = np.asarray(q_goal, dtype=float).copy()
+    q_goal[2] = q_start[2]
+    q_goal[3] = q_start[3]
+    target_peg_xy = np.asarray(target_peg_xy, dtype=float)
+    steps = max(1, int(duration / api.model.opt.timestep))
+    prev_q = q_start.copy()
+    final_q = q_start.copy()
+
+    for i in range(steps):
+        s = smoothstep5((i + 1) / steps)
+        q_nom = q_start + s * (q_goal - q_start)
+        q_nom[2] = q_start[2]
+        q_nom[3] = q_start[3]
+        try:
+            q = solve_revolute12_for_locked_object_xy(
+                api,
+                target_peg_xy,
+                q_nom,
+                grasp_lock,
+                f"screw_{i:03d}",
+                verbose=False,
+            )
+        except RuntimeError:
+            q = q_nom.copy()
+        q[4] = q_nom[4]
+        q[5] = q_nom[5]
+        q[2] = q_start[2]
+        q[3] = q_start[3]
+        qvel = (q - prev_q) / api.model.opt.timestep
+        qvel[2] = 0.0
+        qvel[3] = 0.0
+        command_arm_target(api, q, qvel, lock_joint6=False, joint34_target=q_start[2:4])
+        hold_gripper_target(api, CLOSE_CMD)
+        apply_grasp_lock(api, grasp_lock)
+        prev_q = q.copy()
+        final_q = q.copy()
+        step(api, viewer)
+
+    command_arm_target(api, final_q, lock_joint6=False, joint34_target=q_start[2:4])
+    hold_gripper_target(api, CLOSE_CMD)
     apply_grasp_lock(api, grasp_lock)
 
 
@@ -656,6 +889,15 @@ def count_bad_robot_object_contacts(api: ArmPlatformAPI) -> int:
             if other.endswith("_visual") and other not in allowed:
                 count += 1
     return count
+
+
+def max_contact_force(api: ArmPlatformAPI) -> float:
+    force = np.zeros(6, dtype=float)
+    max_force = 0.0
+    for i in range(api.data.ncon):
+        mujoco.mj_contactForce(api.model, api.data, i, force)
+        max_force = max(max_force, float(np.linalg.norm(force[:3])))
+    return max_force
 
 
 def run_demo(headless: bool = False, seed: int | None = None) -> None:
@@ -760,16 +1002,49 @@ def run_demo(headless: bool = False, seed: int | None = None) -> None:
         print("Phase: move to offset search start using joint1/joint2 only")
         move_arm(api, q_search_xy, 1.20, viewer, gripper_closed=True, grasp_lock=grasp_lock)
         print("Phase: lower to constant contact height using joint5 only")
+        clear_fsc_force(api)
         move_arm(api, q_contact, 0.45, viewer, gripper_closed=True, grasp_lock=grasp_lock, stop_on_object_collision=True)
         print("Phase: Archimedean spiral search using joint1/joint2 only")
+        set_fsc_down_force(api, CONTACT_DOWN_FORCE)
         q_found, found = spiral_search(api, api.arm_controller.get_q(), grasp_lock, object_from_finger_xy, viewer)
-        q_insert = joint5_only_target(q_found, insert_joint5)
-        print("Phase: final insertion using joint5 only")
+        print("Phase: final insertion using joint5 with compensated joint6 screwing")
         if found:
-            move_arm(api, q_insert, 0.55, viewer, gripper_closed=True, grasp_lock=grasp_lock, stop_on_object_collision=True)
+            target_insert_object_z = hole_top_z + CYL_HALF_LENGTH - INSERT_DEPTH_TARGET
+            raw_insert_joint5 = solve_joint5_for_object_z(api, q_found, grasp_lock, target_insert_object_z)
+            insert_joint5 = float(np.clip(raw_insert_joint5 - INSERT_JOINT5_MARGIN, low5, high5))
+            if insert_joint5 < q_found[4]:
+                insert_joint5 = q_found[4]
+            q_insert = joint5_screwing_target(q_found, insert_joint5, SCREW_TURNS)
+            print(
+                "  recomputed insertion height and compensated screwing: "
+                f"current_joint5={q_found[4]:.4f} raw_joint5={raw_insert_joint5:.4f} "
+                f"safe_joint5={insert_joint5:.4f} "
+                f"joint6_turns={SCREW_TURNS:.1f}"
+            )
+            set_fsc_down_force(api, INSERT_DOWN_FORCE)
+            move_arm_screwing_compensated(
+                api,
+                q_insert,
+                SCREW_INSERT_DURATION,
+                grasp_lock=grasp_lock,
+                target_peg_xy=HOLE_CENTER[:2],
+                viewer=viewer,
+            )
+            clear_fsc_force(api)
         else:
             print("  final insertion skipped because spiral did not find containment")
-        hold_current(api, 0.80, viewer, gripper_closed=True, grasp_lock=grasp_lock)
+            clear_fsc_force(api)
+        hold_current(
+            api,
+            0.80,
+            viewer,
+            gripper_closed=True,
+            grasp_lock=grasp_lock,
+            lock_joint6=False,
+            decouple_screw_position=False,
+            position_joint6=q_found[5] if found else None,
+            preserve_joint34=found,
+        )
 
         pos, quat = object_pose(api)
         inserted_depth = peg_inserted_depth(pos)
@@ -784,10 +1059,15 @@ def run_demo(headless: bool = False, seed: int | None = None) -> None:
         print(f"Peg inserted depth: {inserted_depth:.4f} m / hole depth {HOLE_DEPTH:.4f} m")
         print(f"Finger contacts: {count_contacts(api, {'fin1_visual', 'fin2_visual', 'fin1_pad_collision', 'fin2_pad_collision'})}")
         print(f"Hole/block contacts: {count_contacts(api, hole_names)}")
+        print(f"Max instantaneous contact force: {max_contact_force(api):.2f} N")
         print(f"Arm q: {np.round(api.arm_controller.get_q(), 4)}")
     finally:
         if viewer_cm is not None:
             viewer_cm.__exit__(None, None, None)
+        try:
+            xml_path.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def main() -> None:
