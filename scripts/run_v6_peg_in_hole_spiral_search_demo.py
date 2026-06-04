@@ -76,6 +76,10 @@ SPIRAL_STEP_DURATION = 0.035
 SPIRAL_SUCCESS_RADIUS = max(0.003, HOLE_RADIUS - CYL_RADIUS + 0.001)
 SCREW_TURNS = 2.0
 SCREW_INSERT_DURATION = 1.10
+SCREW_COMPENSATE_JOINT12 = False
+SCREW_JOINT2_DAMPING = 16.0
+SCREW_JOINT2_MAX_RATE = 0.75
+SCREW_JOINT2_TARGET_FILTER = 0.35
 CONTACT_DOWN_FORCE = 1.2
 INSERT_DOWN_FORCE = 2.0
 
@@ -768,36 +772,54 @@ def move_arm_screwing_compensated(
     steps = max(1, int(duration / api.model.opt.timestep))
     prev_q = q_start.copy()
     final_q = q_start.copy()
+    base_damping = api.arm_controller.damping_shape.copy()
+    dt = float(api.model.opt.timestep)
 
-    for i in range(steps):
-        s = smoothstep5((i + 1) / steps)
-        q_nom = q_start + s * (q_goal - q_start)
-        q_nom[2] = q_start[2]
-        q_nom[3] = q_start[3]
-        try:
-            q = solve_revolute12_for_locked_object_xy(
-                api,
-                target_peg_xy,
-                q_nom,
-                grasp_lock,
-                f"screw_{i:03d}",
-                verbose=False,
-            )
-        except RuntimeError:
-            q = q_nom.copy()
-        q[4] = q_nom[4]
-        q[5] = q_nom[5]
-        q[2] = q_start[2]
-        q[3] = q_start[3]
-        qvel = (q - prev_q) / api.model.opt.timestep
-        qvel[2] = 0.0
-        qvel[3] = 0.0
-        command_arm_target(api, q, qvel, lock_joint6=False, joint34_target=q_start[2:4])
-        hold_gripper_target(api, CLOSE_CMD)
-        apply_grasp_lock(api, grasp_lock)
-        prev_q = q.copy()
-        final_q = q.copy()
-        step(api, viewer)
+    try:
+        api.arm_controller.damping_shape[1] = max(api.arm_controller.damping_shape[1], SCREW_JOINT2_DAMPING)
+        for i in range(steps):
+            s = smoothstep5((i + 1) / steps)
+            q_nom = q_start + s * (q_goal - q_start)
+            q_nom[2] = q_start[2]
+            q_nom[3] = q_start[3]
+            if SCREW_COMPENSATE_JOINT12:
+                try:
+                    q = solve_revolute12_for_locked_object_xy(
+                        api,
+                        target_peg_xy,
+                        q_nom,
+                        grasp_lock,
+                        f"screw_{i:03d}",
+                        verbose=False,
+                    )
+                except RuntimeError:
+                    q = q_nom.copy()
+            else:
+                q = q_nom.copy()
+
+            q[4] = q_nom[4]
+            q[5] = q_nom[5]
+            q[2] = q_start[2]
+            q[3] = q_start[3]
+
+            if SCREW_COMPENSATE_JOINT12:
+                q2_delta = float(q[1] - prev_q[1])
+                q2_delta = float(np.clip(q2_delta, -SCREW_JOINT2_MAX_RATE * dt, SCREW_JOINT2_MAX_RATE * dt))
+                q[1] = prev_q[1] + SCREW_JOINT2_TARGET_FILTER * q2_delta
+
+            qvel = (q - prev_q) / dt
+            if SCREW_COMPENSATE_JOINT12:
+                qvel[1] = float(np.clip(qvel[1], -SCREW_JOINT2_MAX_RATE, SCREW_JOINT2_MAX_RATE))
+            qvel[2] = 0.0
+            qvel[3] = 0.0
+            command_arm_target(api, q, qvel, lock_joint6=False, joint34_target=q_start[2:4])
+            hold_gripper_target(api, CLOSE_CMD)
+            apply_grasp_lock(api, grasp_lock)
+            prev_q = q.copy()
+            final_q = q.copy()
+            step(api, viewer)
+    finally:
+        api.arm_controller.damping_shape[:] = base_damping
 
     command_arm_target(api, final_q, lock_joint6=False, joint34_target=q_start[2:4])
     hold_gripper_target(api, CLOSE_CMD)
@@ -1007,7 +1029,8 @@ def run_demo(headless: bool = False, seed: int | None = None) -> None:
         print("Phase: Archimedean spiral search using joint1/joint2 only")
         set_fsc_down_force(api, CONTACT_DOWN_FORCE)
         q_found, found = spiral_search(api, api.arm_controller.get_q(), grasp_lock, object_from_finger_xy, viewer)
-        print("Phase: final insertion using joint5 with compensated joint6 screwing")
+        compensation_label = "with joint1/joint2 compensation" if SCREW_COMPENSATE_JOINT12 else "without joint1/joint2 compensation"
+        print(f"Phase: final insertion using joint5 and joint6 screwing ({compensation_label})")
         if found:
             target_insert_object_z = hole_top_z + CYL_HALF_LENGTH - INSERT_DEPTH_TARGET
             raw_insert_joint5 = solve_joint5_for_object_z(api, q_found, grasp_lock, target_insert_object_z)
@@ -1016,7 +1039,7 @@ def run_demo(headless: bool = False, seed: int | None = None) -> None:
                 insert_joint5 = q_found[4]
             q_insert = joint5_screwing_target(q_found, insert_joint5, SCREW_TURNS)
             print(
-                "  recomputed insertion height and compensated screwing: "
+                "  recomputed insertion height and screwing: "
                 f"current_joint5={q_found[4]:.4f} raw_joint5={raw_insert_joint5:.4f} "
                 f"safe_joint5={insert_joint5:.4f} "
                 f"joint6_turns={SCREW_TURNS:.1f}"

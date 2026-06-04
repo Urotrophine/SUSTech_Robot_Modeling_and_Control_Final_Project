@@ -64,7 +64,7 @@ class ArmPlatformAPI:
             self.data,
             self.arm_joint_names,
             kp=[260.0, 260.0, 520.0, 520.0, 3000.0, 120.0],
-            kd=[42.0, 42.0, 72.0, 72.0, 120.0, 28.0],
+            kd=[42.0, 52.0, 72.0, 72.0, 120.0, 28.0],
             joint_ki=[1.5, 1.5, 3.0, 3.0, 14.0, 0.3],
             task_site_name=self.config["sites"]["end_effector"],
             task_kp_pos=[420.0, 420.0, 430.0],
@@ -73,7 +73,7 @@ class ArmPlatformAPI:
             task_kp_rot=[78.0, 78.0, 46.0],
             task_ki_rot=[0.9, 0.9, 0.35],
             task_kd_rot=[11.0, 11.0, 7.5],
-            damping_shape=[3.2, 3.2, 9.0, 9.0, 38.0, 6.5],
+            damping_shape=[3.2, 7.5, 9.0, 9.0, 38.0, 6.5],
             friction_coeff=[0.16, 0.16, 0.24, 0.24, 0.95, 0.12],
         )
 

@@ -1,17 +1,17 @@
 Force/impedance-control quantitative summary
 
 duration_s: 10.022
-max_contact_force_n: 70.8908
-mean_contact_force_n: 8.70492
-final_inserted_depth_m: 0.059447
-insertion_phase_depth_change_m: 0.059447
-max_abs_joint3_rad: 0.00963759
-max_abs_joint4_rad: 0.0392193
-final_joint6_turns: 1.91424
-max_tracking_error: 1.05189
-max_tracking_error_without_q6: 0.0483604
-max_q34_tracking_error: 0.0392848
-final_xy_error_m: 0.00408325
+max_contact_force_n: 72.116
+mean_contact_force_n: 17.7312
+final_inserted_depth_m: 0.0614764
+insertion_phase_depth_change_m: 0.0612501
+max_abs_joint3_rad: 0.00772366
+max_abs_joint4_rad: 0.0403601
+final_joint6_turns: 1.9142
+max_tracking_error: 1.05183
+max_tracking_error_without_q6: 0.0484712
+max_q34_tracking_error: 0.0383317
+final_xy_error_m: 0.00395846
 
 Notes:
 - The full arm tracking error contains joint6 screwing error. The large transient at the start of insertion is expected because joint6 receives a multi-turn target.
