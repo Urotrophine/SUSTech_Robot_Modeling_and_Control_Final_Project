@@ -1,0 +1,50 @@
+# Robot description registry.
+# Keep this file as the single source of truth for joint/site names.
+robot:
+  model_xml: models/robot_with_gripper.xml
+
+arm:
+  joints:
+    - joint1
+    - joint2
+    - joint3
+    - joint4
+  command_names:
+    - q1
+    - q2
+    - q3
+    - d4
+  units:
+    q1: rad
+    q2: rad
+    q3: rad
+    d4: m
+
+gripper:
+  type: mimic_parallel_gripper
+  master_joint: joint5
+  mimic_joint: joint6
+  actuator: gripper_opening
+  command_name: g
+  unit: m
+  opening_range:
+    min: -0.04
+    max: 0.04
+  mimic:
+    joint: joint6
+    source: joint5
+    multiplier: -1.0
+    offset: 0.0
+
+sites:
+  end_effector: ee_site
+  peg_tip: peg_tip_site
+  left_finger_tip: left_finger_tip_site
+  right_finger_tip: right_finger_tip_site
+  hole_entry: hole_entry_site
+  hole_axis: hole_axis_site
+
+  topology:
+    fin1_parent: link4
+    fin2_parent: link4
+    note: fin1 and fin2 are sibling bodies under link4. joint6 mimics joint5 with multiplier -1 for symmetric opening.

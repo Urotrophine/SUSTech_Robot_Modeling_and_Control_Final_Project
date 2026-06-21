@@ -1,0 +1,16 @@
+simple_grasp_environment:
+  model_xml: models/simple_grasp_scene.xml
+  object:
+    name: grasp_object
+    type: cylinder
+    radius: 0.018
+    half_length: 0.07
+    mass: 0.05
+    friction: [2.0, 0.02, 0.002]
+  finger_collision:
+    type: box
+    size: [0.012, 0.018, 0.035]
+    friction: [2.0, 0.02, 0.002]
+  validation:
+    goal: Verify gripper opening/closing and object-finger contacts.
+    not_goal: This is not the final peg-in-hole docking scene.

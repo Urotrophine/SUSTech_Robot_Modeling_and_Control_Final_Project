@@ -51,6 +51,13 @@ class ArmPlatformAPI:
         self.data = mujoco.MjData(self.model)
 
         self.config = self._load_config(config_path)
+        if config_path is None and not self._config_matches_model(self.config):
+            legacy_config = Path(__file__).resolve().parents[2] / "configs" / "robot_description_v2.yaml"
+            if legacy_config.exists():
+                legacy = self._load_config(legacy_config)
+                if self._config_matches_model(legacy):
+                    self.config = legacy
+
         self.arm_joint_names = self.config["arm"]["joints"]
         gripper_cfg = self.config["gripper"]
         gripper_master_joint = gripper_cfg["master_joint"]
@@ -63,9 +70,9 @@ class ArmPlatformAPI:
             self.model,
             self.data,
             self.arm_joint_names,
-            kp=[260.0, 260.0, 520.0, 520.0, 3000.0, 120.0],
-            kd=[42.0, 52.0, 72.0, 72.0, 120.0, 28.0],
-            joint_ki=[1.5, 1.5, 3.0, 3.0, 14.0, 0.3],
+            kp=self._fit_gain([260.0, 260.0, 520.0, 520.0, 3000.0, 120.0], len(self.arm_joint_names)),
+            kd=self._fit_gain([42.0, 52.0, 72.0, 72.0, 120.0, 28.0], len(self.arm_joint_names)),
+            joint_ki=self._fit_gain([1.5, 1.5, 3.0, 3.0, 14.0, 0.3], len(self.arm_joint_names)),
             task_site_name=self.config["sites"]["end_effector"],
             task_kp_pos=[420.0, 420.0, 430.0],
             task_ki_pos=[5.0, 5.0, 16.0],
@@ -73,8 +80,8 @@ class ArmPlatformAPI:
             task_kp_rot=[78.0, 78.0, 46.0],
             task_ki_rot=[0.9, 0.9, 0.35],
             task_kd_rot=[11.0, 11.0, 7.5],
-            damping_shape=[3.2, 7.5, 9.0, 9.0, 38.0, 6.5],
-            friction_coeff=[0.16, 0.16, 0.24, 0.24, 0.95, 0.12],
+            damping_shape=self._fit_gain([3.2, 7.5, 9.0, 9.0, 38.0, 6.5], len(self.arm_joint_names)),
+            friction_coeff=self._fit_gain([0.16, 0.16, 0.24, 0.24, 0.95, 0.12], len(self.arm_joint_names)),
         )
 
         gripper_joints = [gripper_master_joint]
@@ -135,6 +142,34 @@ class ArmPlatformAPI:
             },
             "sites": {"end_effector": "ee_site"},
         }
+
+    def _config_matches_model(self, config: dict[str, Any]) -> bool:
+        joint_names = list(config.get("arm", {}).get("joints", []))
+        gripper_cfg = config.get("gripper", {})
+        joint_names.append(gripper_cfg.get("master_joint", ""))
+        if gripper_cfg.get("mimic_actuator"):
+            joint_names.append(gripper_cfg.get("mimic_joint", ""))
+
+        for name in joint_names:
+            if name and mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, name) < 0:
+                return False
+
+        actuator_names = [gripper_cfg.get("actuator", "")]
+        if gripper_cfg.get("mimic_actuator"):
+            actuator_names.append(gripper_cfg.get("mimic_actuator", ""))
+        for name in actuator_names:
+            if name and mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, name) < 0:
+                return False
+
+        site_name = config.get("sites", {}).get("end_effector", "")
+        return not site_name or mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, site_name) >= 0
+
+    @staticmethod
+    def _fit_gain(values: Sequence[float], size: int) -> list[float]:
+        values = list(values)
+        if len(values) >= size:
+            return values[:size]
+        return values + [values[-1]] * (size - len(values))
 
     def reset(self) -> None:
         mujoco.mj_resetData(self.model, self.data)

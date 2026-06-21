@@ -1,0 +1,7 @@
+trajectory:
+  default_method: quintic
+  default_duration: 4.0
+  supported_methods:
+    - linear
+    - cubic
+    - quintic

@@ -1,0 +1,6 @@
+gripper:
+  open_command: -0.03
+  close_command: 0.03
+  default_command: 0.0
+  max_speed: 0.02
+  holding_threshold: 0.002

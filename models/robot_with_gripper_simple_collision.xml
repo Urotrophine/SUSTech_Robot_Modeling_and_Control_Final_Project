@@ -1,0 +1,71 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mujoco model="robotic_arm_v2_with_gripper">
+  <compiler angle="radian" meshdir="../assets" autolimits="true" />
+  <option timestep="0.002" gravity="0 0 -9.81" integrator="implicitfast" />
+  <default>
+    <joint damping="0.05" armature="0.001" />
+    <geom condim="3" friction="1 0.005 0.0001" />
+  </default>
+  <asset>
+    <mesh name="base_link" file="meshes/base_link.STL" />
+    <mesh name="link1" file="meshes/link1.STL" />
+    <mesh name="link2" file="meshes/link2.STL" />
+    <mesh name="link3" file="meshes/link3.STL" />
+    <mesh name="link4" file="meshes/link4.STL" />
+    <mesh name="fin1" file="meshes/fin1.STL" />
+    <mesh name="fin2" file="meshes/fin2.STL" />
+  </asset>
+  <worldbody>
+    <light name="main_light" pos="0 -1.5 2" dir="0 1 -1.5" />
+    <camera name="overview" pos="1.2 -1.5 1.0" euler="1.1 0 0.7" />
+    <geom name="ground" type="plane" pos="0 0 -0.02" size="2 2 0.02" rgba="0.75 0.75 0.75 1" />
+    <body name="base_link">
+      <inertial pos="0 2.220446049e-16 0.2764052478" mass="4.040873551" fullinertia="0.1295555828 0.1295555828 0.004557062749 3.418483803e-19 2.326294205e-18 -1.080908938e-17" />
+      <geom name="base_link_visual" type="mesh" mesh="base_link" rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" contype="0" conaffinity="0" group="1" density="0" />
+      <body name="link1" pos="0 0 0.6" quat="0.6657110731 0 0 -0.7462096">
+        <joint name="joint1" type="hinge" axis="0 0 -1" range="-3.14 3.14" limited="true" actuatorfrcrange="-100 100" />
+        <inertial pos="0.197135744 -1.599765591e-07 0.05266429782" mass="4.442049315" fullinertia="0.005752458362 0.1115995073 0.1114326577 -3.479441381e-08 4.175890266e-08 -3.987951232e-08" />
+        <geom name="link1_visual" type="mesh" mesh="link1" rgba="1 1 1 1" contype="0" conaffinity="0" group="1" density="0" />
+        <body name="link2" pos="0.4 0 0" quat="1 0 0 0">
+          <joint name="joint2" type="hinge" axis="0 0 -1" range="-3.14 3.14" limited="true" actuatorfrcrange="-100 100" />
+          <inertial pos="0.1132369717 0.1613702855 -0.06340258205" mass="4.442048162" fullinertia="0.07685810263 0.04040187941 0.1115344032 -0.04963547572 0.0003768272575 0.0005369340826" />
+          <geom name="link2_visual" type="mesh" mesh="link2" rgba="1 1 1 1" contype="0" conaffinity="0" group="1" density="0" />
+          <body name="link3" pos="0.18609 0.35833 -0.065" quat="0.6279857048 0.6279880115 0.3250121443 0.3250109505">
+            <joint name="joint3" type="hinge" axis="0 0 -1" range="-3.14 3.14" limited="true" actuatorfrcrange="-100 100" />
+            <inertial pos="0.03269510656 0.01707145413 -0.06245433699" mass="2.155425877" fullinertia="0.005545206681 0.01030652181 0.01186052363 -0.00341790511 5.625979018e-05 2.937554051e-05" />
+            <geom name="link3_visual" type="mesh" mesh="link3" rgba="1 1 1 1" contype="0" conaffinity="0" group="1" density="0" />
+            <body name="link4" pos="0.062321 0.20472 -0.065" quat="0.1684903806 -0.1684909995 0.6867405767 -0.6867380542">
+              <joint name="joint4" type="slide" axis="0 0 1" range="-0.2 0.2" limited="true" actuatorfrcrange="-100 100" />
+              <inertial pos="-2.220446049e-15 3.042011087e-14 0.1648113208" mass="2.12" fullinertia="0.02002825786 0.02056025786 0.002849333333 0 -1.897353802e-18 -3.903127821e-18" />
+              <geom name="link4_visual" type="mesh" mesh="link4" rgba="1 1 1 1" contype="0" conaffinity="0" group="1" density="0" />
+              <site name="ee_site" pos="0 0 0.32" size="0.008" rgba="0 0.8 0 1" />
+              <body name="fin1" pos="-0.1 0.04 0.32" quat="0.4999981634 -0.5 0.5000018366 -0.5">
+                <joint name="joint5" type="slide" axis="0 0 1" range="-0.04 0.04" limited="true" actuatorfrcrange="-100 100" />
+                <inertial pos="0.04 -0.03686046512 0.0175" mass="0.301" fullinertia="0.0002197935562 0.0002703604167 0.0004286998062 -1.558540623e-19 -1.423015351e-19 1.93123512e-19" />
+                <geom name="fin1_visual" type="mesh" mesh="fin1" rgba="1 1 1 1" contype="0" conaffinity="0" group="1" density="0" />
+                <site name="left_finger_tip_site" pos="0.04 -0.035 0.035" size="0.006" rgba="0.8 0 0 1" />
+                <body name="fin2" pos="0 0 0" quat="1 0 0 0">
+                  <joint name="joint6" type="slide" axis="0 0 1" range="-0.04 0.04" limited="true" actuatorfrcrange="-100 100" />
+                  <inertial pos="0.04 -0.03686046512 0.1825" mass="0.301" fullinertia="0.0002197935562 0.0002703604167 0.0004286998062 -1.219727444e-19 -2.371692252e-19 3.964114193e-19" />
+                  <geom name="fin2_visual" type="mesh" mesh="fin2" rgba="1 1 1 1" contype="0" conaffinity="0" group="1" density="0" />
+                  <site name="right_finger_tip_site" pos="0.04 -0.035 0.165" size="0.006" rgba="0 0 0.8 1" />
+                  <site name="peg_tip_site" pos="0.04 -0.035 0.1" size="0.006" rgba="1 0.5 0 1" />
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+  <equality>
+    <joint name="joint6_mimic_joint5" joint1="joint6" joint2="joint5" polycoef="0 -1 0 0 0" />
+  </equality>
+  <actuator>
+    <position name="joint1_pos" joint="joint1" kp="80" kv="8" ctrllimited="true" ctrlrange="-3.14 3.14" />
+    <position name="joint2_pos" joint="joint2" kp="80" kv="8" ctrllimited="true" ctrlrange="-3.14 3.14" />
+    <position name="joint3_pos" joint="joint3" kp="80" kv="8" ctrllimited="true" ctrlrange="-3.14 3.14" />
+    <position name="joint4_pos" joint="joint4" kp="200" kv="20" ctrllimited="true" ctrlrange="-0.2 0.2" />
+    <position name="gripper_opening" joint="joint5" kp="200" kv="20" ctrllimited="true" ctrlrange="-0.04 0.04" />
+  </actuator>
+</mujoco>

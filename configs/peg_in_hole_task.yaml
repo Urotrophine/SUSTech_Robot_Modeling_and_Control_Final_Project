@@ -1,0 +1,90 @@
+peg_in_hole:
+  reference_paper: Compliance-Based Robotic Peg-in-Hole Assembly Strategy Without Force Feedback
+  reproduction:
+    level: algorithm
+    simulated_vision: MuJoCo camera coarse localization or random XY offset fallback
+    represented_steps:
+      reaching: pushing
+      searching: pushing + rubbing / Archimedes spiral
+      inserting: pushing + wiggling + screwing
+    limitations:
+      - no Kinect/Canny/Hough visual recognition pipeline
+      - no torque-level compliant controller reproduction
+      - no high-fidelity 0.01 mm clearance contact experiment
+  model_xml: models/peg_in_hole_scene.xml
+
+  sites:
+    peg_tip: peg_tip_site
+    hole_entry: hole_entry_site
+    hole_axis: hole_axis_site
+
+  geometry:
+    hole_entry_world: [0.5111, 0.0565, 0.2371]
+    initial_home_q: [-0.52, -0.8667, 0.52, 0.0]
+    initial_grasp_q: [1.04, -0.8667, 0.52, 0.0]
+    vertical_tool_seed_q: [-0.52, -0.8667, 0.52, 0.0]
+    grasp_approach_duration: 2.0
+    grasp_ready_hold: 0.3
+    gripper_close_duration: 0.6
+    grasp_settle_time: 0.2
+    shaft_axis_mode: tool
+    # Used as the fixed-offset fallback and as the default random offset radius norm.
+    initial_search_offset_xy: [0.016, -0.012]
+    pre_insert_clearance: 0.10
+    # Keep the shaft below the finger midpoint so it is visibly held at the tips,
+    # instead of passing through the upper gripper body.
+    grasp_to_tip: 0.130
+    alignment_tolerance: 0.004
+    shaft_radius: 0.016
+    shaft_half_length: 0.060
+
+  state_sequence:
+    - idle
+    - initial_grasp
+    - grasp_peg
+    - move_to_pre_insert
+    - reaching_push
+    - searching_spiral
+    - inserting_wiggle_screw
+    - complete
+
+  search:
+    planner: archimedes_spiral
+    radius_max: 0.03
+    pitch: 0.003
+    angular_speed: 2.0
+    timeout: 30.0
+
+  vision:
+    camera: vision_retrain
+    width: 640
+    height: 480
+    crop_size: 224
+    crop_hole_scale: 5.0
+    hole_size_world: 0.060
+    pixel_noise_std: 2.0
+    model: ../mujoco-peg-in-hole-visual-retrain/checkpoints/mujoco_original_unet_rebuilt/mujoco_resnetunet_best.pth
+
+  insertion:
+    push_depth: 0.03
+    success_depth: 0.025
+    wiggle_amplitude: 0.002
+    screw_amplitude_rad: 0.2
+    screw_turns: 3.0
+    handoff_duration: 0.8
+    duration: 5.0
+    timeout: 8.0
+
+  force_control:
+    target_force: 5.0
+    k_force: 0.004
+    max_speed: 0.015
+    filter_alpha: 0.15
+    deadband: 0.10
+    pseudo_contact_stiffness: 1200.0
+
+  contact_detection:
+    use_kinematic_velocity: true
+    velocity_threshold: 0.02
+    hold_time: 0.3
+    contact_tolerance: 0.002

@@ -1,0 +1,7 @@
+ik:
+  end_effector_site: ee_site
+  max_iter: 250
+  tolerance: 1.0e-4
+  damping: 1.0e-3
+  step_scale: 0.7
+  max_step: 0.12

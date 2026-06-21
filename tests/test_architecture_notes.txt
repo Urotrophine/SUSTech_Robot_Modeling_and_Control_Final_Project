@@ -1,0 +1,1 @@
+Run scripts/run_architecture_smoke_test.py after installing mujoco.

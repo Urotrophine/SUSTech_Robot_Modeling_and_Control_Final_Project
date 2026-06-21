@@ -76,6 +76,32 @@ environment.yml           Conda environment description
 requirements.txt          minimal Python dependencies
 ```
 
+## Integrated ME311 Extensions
+
+The repository now also includes the local ME311 task-level work, organized into
+the existing project layout without replacing the v7 baseline assets or demo:
+
+- `src/task/peg_in_hole/`: paper-stage state machine, spiral trace export, and
+  algorithm-to-paper phase mapping.
+- `src/vision/`: MuJoCo keypoint vision helpers and optional UNet keypoint
+  inference utilities.
+- `src/planning/spiral_search.py`, `src/planning/screw_motion.py`, and
+  `src/planning/vision_error.py`: reusable search, insertion, and vision-offset
+  planners.
+- `src/control/admittance_controller.py` and
+  `src/control/torque_force_controller.py`: force/admittance control prototypes.
+- `models/peg_in_hole_scene.xml` and `configs/robot_description_v2.yaml`: the
+  legacy ME311 peg-in-hole scene and matching robot registry.
+- `tests/test_peg_in_hole_algorithms.py`: regression tests for the task,
+  planning, and vision helpers.
+
+`ArmPlatformAPI` keeps using `configs/robot_description.yaml` for the v7 model.
+When a legacy ME311 XML is loaded without an explicit config, it automatically
+falls back to `configs/robot_description_v2.yaml` if that registry matches the
+model. This keeps the original v7 demo intact while allowing the imported
+ME311 scripts such as `scripts/run_peg_in_hole_demo.py` to run against their
+matching legacy scene.
+
 ## Robot Model
 
 The current robot is the v7 model:

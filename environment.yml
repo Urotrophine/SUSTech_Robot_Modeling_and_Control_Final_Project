@@ -8,3 +8,6 @@ dependencies:
       - mujoco
       - numpy
       - PyYAML
+      - Pillow
+      - torch
+      - torchvision

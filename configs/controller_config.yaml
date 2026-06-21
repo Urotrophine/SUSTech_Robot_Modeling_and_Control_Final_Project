@@ -1,0 +1,19 @@
+arm_position_controller:
+  kp:
+    joint1: 80
+    joint2: 80
+    joint3: 80
+    joint4: 200
+  kv:
+    joint1: 8
+    joint2: 8
+    joint3: 8
+    joint4: 20
+
+gripper_position_controller:
+  kp: 200
+  kv: 20
+
+control_mode:
+  arm: position
+  gripper: position
